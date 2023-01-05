@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/ForeverSRC/ganyu/pkg/domain"
@@ -21,7 +22,7 @@ func NewTopicRedisRepository(client redisclient.UniversalClient) *TopicRedisRepo
 }
 
 func (tr *TopicRedisRepository) CreateTopic(ctx context.Context, topic domain.Topic) error {
-	ok, err := tr.client.SetNX(ctx, tr.topicKey(topic.Name), fmt.Sprintf("%d", topic.Partitions), 0).Result()
+	ok, err := tr.client.SetNX(ctx, tr.topicMetaPartitionNumsKey(topic.Name), fmt.Sprintf("%d", topic.Partitions), 0).Result()
 	if err != nil {
 		return err
 	}
@@ -47,8 +48,22 @@ func (tr *TopicRedisRepository) CreateTopic(ctx context.Context, topic domain.To
 
 }
 
-func (tr *TopicRedisRepository) topicKey(topic string) string {
-	return fmt.Sprintf(topicMetaKeyFormat, topic)
+func (tr *TopicRedisRepository) GetTopicPartitions(ctx context.Context, topic string) (int, error) {
+	r, err := tr.client.Get(ctx, tr.topicMetaPartitionNumsKey(topic)).Result()
+	if err != nil {
+		return -1, err
+	}
+
+	num, err := strconv.Atoi(r)
+	if err != nil {
+		return -1, err
+	}
+
+	return num, nil
+}
+
+func (tr *TopicRedisRepository) topicMetaPartitionNumsKey(topic string) string {
+	return fmt.Sprintf(topicMetaPartitionNumsKeyFormat, topic)
 }
 
 func (tr *TopicRedisRepository) partitionsKey(topic string) string {
