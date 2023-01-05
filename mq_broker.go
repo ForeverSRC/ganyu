@@ -1,17 +1,17 @@
-package broker
+package ganyu
 
 import (
 	"context"
-
-	"github.com/ForeverSRC/ganyu/pkg/logger"
+	"hash/fnv"
 
 	"github.com/ForeverSRC/ganyu/pkg/domain"
-
+	"github.com/ForeverSRC/ganyu/pkg/logger"
 	redisstorage "github.com/ForeverSRC/ganyu/pkg/storage/redis"
 )
 
 type Broker interface {
 	CreateTopic(ctx context.Context, topic domain.Topic) error
+	Push(ctx context.Context, topic, payload, partitionKey string) error
 }
 
 type defaultBroker struct {
@@ -51,4 +51,26 @@ func newDefaultBroker(opts *BrokerOpts) *defaultBroker {
 
 func (b *defaultBroker) CreateTopic(ctx context.Context, topic domain.Topic) error {
 	return b.repo.CreateTopic(ctx, topic)
+}
+
+func (b *defaultBroker) Push(ctx context.Context, topic, payload, partitionKey string) error {
+	partition := b.partitionRoute(ctx, topic, partitionKey)
+	return b.repo.Push(ctx, topic, payload, partition)
+}
+
+func (b *defaultBroker) partitionRoute(ctx context.Context, topic, partitionKey string) int {
+	h := fnv.New64()
+	_, err := h.Write([]byte(partitionKey))
+	if err != nil {
+		return 0
+	}
+
+	count, err := b.repo.GetTopicPartitions(ctx, topic)
+	if err != nil {
+		b.logger.Error("get partition count of topic %s error %v", topic, err)
+		return 0
+	}
+
+	return int(h.Sum64() % uint64(count))
+
 }

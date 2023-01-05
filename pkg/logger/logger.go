@@ -13,7 +13,7 @@ type Logger interface {
 }
 
 func DefaultLogger() Logger {
-	return NewLogrusLogger(logrus.DebugLevel)
+	return NewLogrusLogger(logrus.InfoLevel)
 }
 
 func NewLogrusLogger(level logrus.Level) *logrus.Logger {
